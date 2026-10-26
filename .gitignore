@@ -1,0 +1,28 @@
+# .NET build output
+**/bin/
+**/obj/
+*.dll
+*.pdb
+*.user
+*.suo
+
+# Angular and Node.js generated files
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.angular/cache/
+/frontend/coverage/
+/frontend/.sass-cache/
+/frontend/out-tsc/
+/frontend/npm-debug.log*
+/frontend/yarn-error.log*
+
+# IDE and editor files
+.idea/
+.vs/
+*.sln.docstates
+*.userprefs
+
+# Operating system files
+.DS_Store
+Thumbs.db
+desktop.ini

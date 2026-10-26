@@ -1,0 +1,125 @@
+<main class="page">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Tic Tac Toe</p>
+      <h1>Play a game</h1>
+    </div>
+    <label class="mode-picker" [title]="modeSelectorTooltip()">
+      <span>Game mode</span>
+      <select
+        [value]="selectedMode()"
+        [disabled]="store.loading() || modeSelectionLocked()"
+        [title]="modeSelectorTooltip()"
+        (change)="onModeChange($event)"
+      >
+        <option value="TwoPlayer">Two Player</option>
+        <option value="Computer">Play Against Computer</option>
+      </select>
+    </label>
+  </header>
+
+  @if (store.errorMessage(); as errorMessage) {
+    <p class="error-message" role="alert">{{ errorMessage }}</p>
+  }
+
+  @if (store.gameState(); as game) {
+    <p
+      class="status-line"
+      [class.finished]="game.status !== 'InProgress'"
+      role="status"
+      aria-live="polite"
+    >
+      {{ statusLine() }}
+    </p>
+
+    <div class="game-layout">
+      <section class="panel play-panel" aria-labelledby="board-heading">
+        <div class="panel-heading">
+          <h2 id="board-heading">Board</h2>
+          <span class="mode-badge">
+            {{ game.mode === 'TwoPlayer' ? 'Two Player' : 'Play Against Computer' }}
+          </span>
+        </div>
+
+        <app-board
+          [board]="game.board"
+          [winningCells]="game.winningCells"
+          [gameOver]="game.status !== 'InProgress' || store.loading()"
+          (cellSelected)="store.playCell($event)"
+        />
+
+        <div class="game-actions">
+          <button
+            class="primary-button"
+            type="button"
+            [disabled]="store.loading()"
+            (click)="store.resetGame()"
+          >
+            Reset Game
+          </button>
+          <button
+            class="secondary-button"
+            type="button"
+            [disabled]="!game.canUndo || store.loading()"
+            (click)="store.undo()"
+          >
+            Undo Last Move
+          </button>
+        </div>
+        @if (store.loading()) {
+          <p class="loading-note" aria-live="polite">Updating game…</p>
+        }
+      </section>
+
+      <aside class="side-panels">
+        <app-scoreboard
+            title="Two Player Scoreboard"
+            mode="TwoPlayer"
+            xLabel="X wins"
+            oLabel="O wins"
+            drawsLabel="Draws"
+            [xWins]="game.scoreboard.twoPlayer.xWins"
+            [oWins]="game.scoreboard.twoPlayer.oWins"
+            [draws]="game.scoreboard.twoPlayer.draws"
+            [active]="selectedMode() === 'TwoPlayer'"
+            [disabled]="store.loading()"
+            (resetRequested)="store.resetScoreboard($event)"
+        />
+
+        <app-scoreboard
+            title="Computer Scoreboard"
+            mode="Computer"
+            xLabel="Player (X) wins"
+            oLabel="Computer (O) wins"
+            drawsLabel="Draws"
+            [xWins]="game.scoreboard.computer.xWins"
+            [oWins]="game.scoreboard.computer.oWins"
+            [draws]="game.scoreboard.computer.draws"
+            [active]="selectedMode() === 'Computer'"
+            [disabled]="store.loading()"
+            (resetRequested)="store.resetScoreboard($event)"
+        />
+
+        <section class="panel history-panel" aria-labelledby="history-heading">
+          <h2 id="history-heading">Move history</h2>
+          <app-move-history [moves]="game.moves" />
+        </section>
+      </aside>
+    </div>
+  } @else {
+    <section class="panel initial-state" aria-live="polite">
+      @if (store.loading()) {
+        <p>Starting a new game…</p>
+      } @else {
+        <p>Choose a game mode to start playing.</p>
+        <button
+          class="primary-button"
+          type="button"
+          (click)="store.startGame(selectedMode())"
+        >
+          Start Game
+        </button>
+      }
+    </section>
+  }
+</main>

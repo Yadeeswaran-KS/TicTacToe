@@ -1,0 +1,30 @@
+<section class="scoreboard-panel" [class.active]="active()" [attr.aria-label]="title()">
+  <header class="scoreboard-heading">
+    <h2>{{ title() }}</h2>
+    @if (active()) {
+      <span class="active-badge">Active</span>
+    }
+  </header>
+  <dl class="scores">
+    <div class="score">
+      <dt>{{ xLabel() }}</dt>
+      <dd>{{ xWins() }}</dd>
+    </div>
+    <div class="score">
+      <dt>{{ oLabel() }}</dt>
+      <dd>{{ oWins() }}</dd>
+    </div>
+    <div class="score">
+      <dt>{{ drawsLabel() }}</dt>
+      <dd>{{ draws() }}</dd>
+    </div>
+  </dl>
+  <button
+    class="secondary-button"
+    type="button"
+    [disabled]="disabled()"
+    (click)="resetRequested.emit(mode())"
+  >
+    Reset Scoreboard
+  </button>
+</section>

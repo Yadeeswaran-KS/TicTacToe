@@ -1,0 +1,26 @@
+<div class="table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Move</th>
+        <th scope="col">Player</th>
+        <th scope="col">Position</th>
+      </tr>
+    </thead>
+    <tbody>
+      @if (moves().length === 0) {
+        <tr>
+          <td class="empty" colspan="3">No moves yet</td>
+        </tr>
+      } @else {
+        @for (move of moves(); track move.moveNumber) {
+          <tr>
+            <td>{{ move.moveNumber }}</td>
+            <td>{{ move.player }}</td>
+            <td>Row {{ move.row + 1 }}, Column {{ move.column + 1 }}</td>
+          </tr>
+        }
+      }
+    </tbody>
+  </table>
+</div>

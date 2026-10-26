@@ -1,0 +1,202 @@
+# API reference
+
+The API uses JSON request and response bodies. Enum values are serialized as strings. Paths below are relative to the API origin. The checked-in HTTP launch profile uses `http://localhost:5218`; the Angular environment currently points to `http://localhost:5037`.
+
+All endpoints require an `X-Session-Id` header containing a non-empty GUID. The frontend generates this ID once per browser session and persists it in `sessionStorage`. Games are accessible only with the session ID that created them; both mode-specific scoreboards are isolated by session. Missing or invalid session IDs return `400 Bad Request`. This client-generated ID is for session separation, not authentication.
+
+## Game state response
+
+Game creation, reads, moves, undo, and game reset return this response shape. Example values below represent a newly created Two Player game; the `gameId` is illustrative.
+
+```json
+{
+  "gameId": "11111111-1111-1111-1111-111111111111",
+  "mode": "TwoPlayer",
+  "status": "InProgress",
+  "currentPlayer": "X",
+  "winner": null,
+  "winningCells": [],
+  "board": [
+    [null, null, null],
+    [null, null, null],
+    [null, null, null]
+  ],
+  "moves": [],
+  "canUndo": false,
+  "scoreboard": {
+    "twoPlayer": { "xWins": 0, "oWins": 0, "draws": 0 },
+    "computer": { "xWins": 0, "oWins": 0, "draws": 0 }
+  }
+}
+```
+
+`board` contains three rows. `winningCells` contains row-major cell indexes. Each move has `moveNumber`, `player`, `row`, and `column`; rows and columns in the API are zero-based. `currentPlayer` and `winner` are `null` where no player is applicable. The game state includes both scoreboards for the current session after every action.
+
+## Endpoints
+
+| Method and path | Request | Success | Error cases |
+|---|---|---|---|
+| `POST /api/games` | `{"mode":"TwoPlayer"}` or `{"mode":"Computer"}` | `201 Created`, game state; `Location` points to the new game resource. | `400` request validation (see [validation response](#request-validation--400)). |
+| `GET /api/games/{id}` | GUID path parameter | `200 OK`, game state. | `404` game not found. |
+| `POST /api/games/{id}/moves` | `{"player":"X","row":0,"column":0}` | `200 OK`, updated game state. In Computer mode a valid human move is followed by an O response when the game is still in progress. | `400` request validation or out of bounds; `404` game not found; `409` `CellOccupied`, `GameOver`, or `WrongPlayer`. |
+| `POST /api/games/{id}/undo` | No required body; `{}` is accepted | `200 OK`, updated game state. | `404` game not found; `409` `NothingToUndo` or `UndoNotAllowed`. |
+| `POST /api/games/{id}/reset` | No required body; `{}` is accepted | `200 OK`, reset game state. Scores are unchanged. | `404` game not found. |
+| `GET /api/scoreboard` | No request body | `200 OK`, both scoreboards. | `400` missing or invalid session ID. |
+| `POST /api/scoreboard/reset?mode=TwoPlayer` | Required `mode` query parameter; no required body | `200 OK`, both scoreboards after resetting Two Player. | `400` missing or invalid mode. |
+| `POST /api/scoreboard/reset?mode=Computer` | Required `mode` query parameter; no required body | `200 OK`, both scoreboards after resetting Computer. | `400` missing or invalid mode. |
+
+All game endpoints also return `400` if `X-Session-Id` is missing or invalid. A game ID belonging to another session is treated as not found (`404`).
+
+### `POST /api/games`
+
+Request:
+
+```json
+{ "mode": "Computer" }
+```
+
+Allowed mode strings are `TwoPlayer` and `Computer`. Success is `201 Created` with the game state response above.
+
+### `GET /api/games/{id}`
+
+Example:
+
+```http
+GET /api/games/11111111-1111-1111-1111-111111111111
+```
+
+Success is `200 OK` with the game state response.
+
+### `POST /api/games/{id}/moves`
+
+Request:
+
+```json
+{ "player": "X", "row": 0, "column": 0 }
+```
+
+`player` is `X` or `O`; `row` and `column` are integers from 0 through 2. Success is `200 OK` with the updated game state.
+
+### `POST /api/games/{id}/undo`
+
+No request fields are read. The frontend sends `{}`. In Two Player mode one move is removed. In Computer mode the human move and its automatic reply are removed. Success is `200 OK`.
+
+### `POST /api/games/{id}/reset`
+
+No request fields are read. The frontend sends `{}`. This clears that game's move list and starts it again without resetting scoreboards. Success is `200 OK`.
+
+### `GET /api/scoreboard`
+
+Success response:
+
+```json
+{
+  "twoPlayer": { "xWins": 0, "oWins": 0, "draws": 0 },
+  "computer": { "xWins": 0, "oWins": 0, "draws": 0 }
+}
+```
+
+### `POST /api/scoreboard/reset`
+
+`mode` is a required query parameter and must be exactly `TwoPlayer` or `Computer`. For example:
+
+```http
+POST /api/scoreboard/reset?mode=Computer
+```
+
+The request body is not used. Success is `200 OK` with both scoreboards, with only the selected scoreboard reset.
+
+## Error responses
+
+The following examples show response properties generated by the application. A framework-generated validation response has a dynamic trace ID and field errors that depend on the invalid request. Error objects use the ProblemDetails JSON shape.
+
+### Request validation — 400
+
+`[ApiController]` returns a validation ProblemDetails response when a required request property is missing or cannot be bound. For example, a create request with an empty object returns this body; other validation failures have error keys/messages for the failing fields.
+
+```json
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "Mode": ["The Mode field is required."]
+  },
+  "traceId": "<request trace identifier>"
+}
+```
+
+### Missing or invalid session header — 400
+
+All endpoints require an `X-Session-Id` header containing a non-empty GUID. If the header is missing, malformed, or contains the empty GUID:
+
+```json
+{
+  "title": "Invalid session",
+  "status": 400,
+  "detail": "A valid X-Session-Id header is required."
+}
+```
+
+### Out-of-bounds move — 400
+
+For a move with a row or column outside 0 through 2:
+
+```json
+{
+  "status": 400,
+  "title": "Invalid move",
+  "detail": "The game operation is not allowed: OutOfBounds.",
+  "reasonCode": "OutOfBounds"
+}
+```
+
+### Missing game — 404
+
+For a well-formed GUID that does not identify a game:
+
+```json
+{
+  "status": 404,
+  "title": "Game not found",
+  "detail": "Game '<game GUID>' was not found."
+}
+```
+
+The `{id:guid}` route constraint only matches GUID-formatted path segments. A path segment that is not a GUID does not reach the controller action; the API does not define a custom ProblemDetails body for that route mismatch.
+
+### Other game-rule violations — 409
+
+The filter returns `409 Conflict` for `CellOccupied`, `GameOver`, `WrongPlayer`, `NothingToUndo`, and `UndoNotAllowed`. `reasonCode` and `detail` correspond to the encountered reason. For example:
+
+```json
+{
+  "status": 409,
+  "title": "Game rule violation",
+  "detail": "The game operation is not allowed: CellOccupied.",
+  "reasonCode": "CellOccupied"
+}
+```
+
+The other possible detail/reason pairs are:
+
+| `reasonCode` | `detail` |
+|---|---|
+| `GameOver` | `The game operation is not allowed: GameOver.` |
+| `WrongPlayer` | `The game operation is not allowed: WrongPlayer.` |
+| `NothingToUndo` | `The game operation is not allowed: NothingToUndo.` |
+| `UndoNotAllowed` | `The game operation is not allowed: UndoNotAllowed.` |
+
+### Missing or invalid scoreboard reset mode — 400
+
+For a missing mode, an unrecognized mode, or a numeric enum value:
+
+```json
+{
+  "status": 400,
+  "title": "Invalid scoreboard mode",
+  "detail": "The mode query parameter must be either 'TwoPlayer' or 'Computer'."
+}
+```
+
+The API exception filter handles the listed game/application exceptions. It does not convert arbitrary unexpected exceptions into this documented ProblemDetails format.
